@@ -1,70 +1,34 @@
 #!/usr/bin/env bash
-# deploy.sh — One-shot Supabase + Vercel deployment for Excel CES
-# Usage: bash deploy.sh
-# Prerequisites:
-#   1. You have a Supabase project created at supabase.com
-#   2. You've run: vercel login
+# deploy.sh — safe production deploy for Excel CES.
+#
+# CHANGED (Phase 0 hardening): this script no longer writes/overwrites .env and
+# no longer reseeds the database. The old version did `cat > .env` (which wiped
+# the Clerk keys and webhook secret) and ran `prisma db seed` against production
+# on every deploy — both were data-loss footguns. Environment variables now live
+# in the Vercel project settings; pull them locally with:
+#   npx vercel env pull .env --environment=production
+#
+# Preferred long-term path: connect the Vercel project to the GitHub repo so a
+# push to main deploys automatically. This script is the manual fallback.
 
-set -e
-
-echo ""
-echo "=== Excel CES — Deploy to Supabase + Vercel ==="
-echo ""
-
-# ── Step 1: Collect Supabase credentials ────────────────────────────────────
-
-echo "You need two URLs from your Supabase project."
-echo "Go to: supabase.com → your project → Settings → Database → Connection string"
-echo ""
-echo "Paste the TRANSACTION POOLER url (port 6543, used by the app at runtime):"
-read -r DATABASE_URL
+set -euo pipefail
 
 echo ""
-echo "Paste the SESSION MODE / DIRECT url (port 5432, used by Prisma migrations):"
-read -r DIRECT_URL
-
+echo "=== Excel CES — production deploy ==="
 echo ""
-echo "Got it. Validating connection..."
 
-# ── Step 2: Write local .env ─────────────────────────────────────────────────
-
-cat > .env <<EOF
-DATABASE_URL="${DATABASE_URL}"
-DIRECT_URL="${DIRECT_URL}"
-EOF
-
-echo "✓ .env written"
-
-# ── Step 3: Run migrations against Supabase ──────────────────────────────────
-
-echo ""
-echo "Running Prisma migrations..."
+# 1. Apply any pending migrations to the database in .env (DIRECT_URL).
+#    migrate deploy only applies existing migrations; it never resets data.
+echo "Applying migrations (prisma migrate deploy)..."
 npx prisma migrate deploy
 echo "✓ Migrations applied"
 
-# ── Step 4: Seed the database ────────────────────────────────────────────────
-
-echo ""
-echo "Seeding database (products, users)..."
-npx prisma db seed
-echo "✓ Database seeded"
-
-# ── Step 5: Deploy to Vercel with env vars ───────────────────────────────────
-
+# 2. Deploy to Vercel production. Env vars come from the Vercel project, not .env.
 echo ""
 echo "Deploying to Vercel..."
-
-# Set env vars on Vercel (all environments)
-echo "$DATABASE_URL" | vercel env add DATABASE_URL production --force 2>/dev/null || \
-  vercel env add DATABASE_URL production <<< "$DATABASE_URL"
-
-echo "$DIRECT_URL" | vercel env add DIRECT_URL production --force 2>/dev/null || \
-  vercel env add DIRECT_URL production <<< "$DIRECT_URL"
-
-# Deploy
-vercel --prod --yes
+npx vercel --prod --yes
 
 echo ""
-echo "=== Done! ==="
-echo "Your app is live. Check the URL above."
-echo "Share /dev/accuracy-test with anyone to verify the pricing engine."
+echo "=== Done ==="
+echo "Env vars are managed in the Vercel dashboard. This script does not touch"
+echo ".env or seed the database. To (re)seed intentionally: npm run db:seed."

@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { calculateEstimate, type LineItem } from "./pricing-engine";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { requireDbUserAction } from "./auth";
 import {
   canSeeAllProjects,
@@ -30,15 +30,45 @@ export async function getCurrentDbUser() {
   }
 }
 
-/** Claim a DB User record for a newly-signed-in Clerk user. */
-export async function claimUserRecord(clerkId: string, dbUserId: string) {
-  // Verify the target record isn't already claimed
-  const target = await prisma.user.findUnique({ where: { id: dbUserId } });
-  if (!target) return { error: "User record not found." };
-  if (target.clerkId && target.clerkId !== clerkId) {
-    return { error: "This account is already linked to another login." };
+/**
+ * Link the signed-in Clerk user to their existing staff record.
+ *
+ * Security: identity comes entirely from the server session — never from the
+ * client. A record may be claimed only if it is unlinked AND its email equals
+ * the session's verified primary email. This prevents a stranger from claiming
+ * a higher-privileged record (e.g. SYSTEM_ADMIN), which the old signature
+ * (taking clerkId + a client-chosen dbUserId) allowed.
+ */
+export async function claimUserRecord() {
+  const { userId } = await auth();
+  if (!userId) return { error: "Not signed in. Please sign in again." };
+
+  // Already linked → nothing to claim.
+  const already = await prisma.user.findUnique({ where: { clerkId: userId } });
+  if (already) redirect("/projects");
+
+  const clerkUser = await currentUser();
+  const primaryId = clerkUser?.primaryEmailAddressId;
+  const email =
+    clerkUser?.emailAddresses?.find((e) => e.id === primaryId)?.emailAddress ??
+    clerkUser?.emailAddresses?.[0]?.emailAddress ??
+    null;
+  if (!email) {
+    return { error: "Your login has no email address. Contact an admin." };
   }
-  await prisma.user.update({ where: { id: dbUserId }, data: { clerkId } });
+
+  // Only an unlinked record whose email matches the verified session email.
+  const target = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" }, clerkId: null },
+  });
+  if (!target) {
+    return {
+      error:
+        "No staff record matches your email. Ask an admin to add your account, then sign in again.",
+    };
+  }
+
+  await prisma.user.update({ where: { id: target.id }, data: { clerkId: userId } });
   redirect("/projects");
 }
 

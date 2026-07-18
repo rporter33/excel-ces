@@ -17,3 +17,7 @@ out/
 
 # misc
 .DS_Store
+
+# branding demo mockups carry real customer PII — never commit. The reference
+# copy lives outside the repo at ../excel-ces-recovery/. See branding/README.md.
+branding/*.html
