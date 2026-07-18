@@ -1,0 +1,5 @@
+# Never upload env files with deployments — runtime uses Vercel project env vars.
+# (The 2026 recovery worked because an old deploy bundled .env; that must not repeat.)
+.env
+.env.local
+.env.*.local

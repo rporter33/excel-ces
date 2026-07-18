@@ -21,5 +21,17 @@ taught:
   "Tenant or user not found" means paused project, not bad credentials —
   restore it from the Supabase dashboard first, then debug.
 
+- CLI deploys upload the working directory *including `.env`* unless
+  `.vercelignore` excludes it — that is exactly how secrets ended up inside
+  deployment bundles. `.vercelignore` now excludes all env files; keep it.
+- Vercel "Sensitive" env vars are write-only: `vercel env pull` emits the
+  literal string `[SENSITIVE]` and will clobber a working `.env`. Never
+  blind-pull over a good `.env`; keep sensitive values (DB password, webhook
+  secret) in the password manager and restore them locally by hand.
+- Rotation paste traps that cost an hour: Supabase "Direct connection"
+  (`db.<ref>...`) is IPv6-only — the app needs the *Transaction pooler*
+  (`:6543` + `?pgbouncer=true`) and migrations the *Session pooler* (`:5432`);
+  stray trailing newlines in dashboard paste fields break the database name.
+
 Permanent fix: private GitHub remote, push every session. A deploy platform
 is an accidental backup, not a source of truth.
