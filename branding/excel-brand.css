@@ -1,0 +1,368 @@
+/* ============================================================
+   EXCEL ROOFING — CES BRAND STYLESHEET  v1.0 (July 2026)
+   Source of truth: EXCEL_BRAND_GUIDE.md
+   ------------------------------------------------------------
+   Install:
+   1. Add the fonts link anywhere in <head>, and this stylesheet
+      LAST in <head>, AFTER the app's own styles (order matters:
+      the component overrides here must win specificity ties):
+      <link href="https://fonts.googleapis.com/css2?family=Jost:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+      <link rel="stylesheet" href="excel-brand.css">  <!-- after app CSS -->
+   2. Delete the :root block from the demo's inline <style>.
+      The compatibility layer below remaps every old variable
+      (--red, --navy, --gold, etc.) to canonical tokens, so the
+      demo's existing rules inherit correct brand values instantly.
+   3. Component classes here intentionally reuse the demo's class
+      names (.btn-primary, .chip, .status-badge, ...). Load order
+      makes these definitions win where they overlap.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   1. DESIGN TOKENS
+   ------------------------------------------------------------ */
+:root {
+  /* Brand anchors */
+  --excel-navy: #02205F;             /* RGB 2,32,95 · print C100 M87 Y0 K2 */
+  --excel-red:  #E31E26;             /* RGB 227,30,38 · print C4 M100 Y100 K1 */
+  --excel-ink:  #011030;             /* swoosh accent: navy + 50% black */
+
+  /* Navy ramp — structure, chrome, text accents */
+  --excel-navy-50:  #F2F4F8;
+  --excel-navy-100: #E6E9F1;
+  --excel-navy-200: #C0C8DB;
+  --excel-navy-300: #8D9BBB;
+  --excel-navy-400: #5B6E9A;
+  --excel-navy-500: #2F4880;
+  --excel-navy-600: #02205F;         /* brand */
+  --excel-navy-700: #021A4D;
+  --excel-navy-800: #01153E;
+  --excel-navy-900: #011030;         /* ink / swoosh */
+
+  /* Red ramp — action only (≤10% of any screen) */
+  --excel-red-50:  #FDEEEF;
+  --excel-red-100: #FADADC;
+  --excel-red-200: #F4AFB3;
+  --excel-red-300: #EE7B82;
+  --excel-red-400: #E84A53;
+  --excel-red-500: #E31E26;          /* brand */
+  --excel-red-600: #C4161D;          /* hover */
+  --excel-red-700: #A01218;          /* active/pressed */
+  --excel-red-900: #5C0A0E;
+
+  /* Neutrals — cool gray, slight navy cast */
+  --excel-neutral-0:   #FFFFFF;
+  --excel-neutral-25:  #FAFBFD;
+  --excel-neutral-50:  #F4F6FA;      /* app background */
+  --excel-neutral-100: #ECEEF5;
+  --excel-neutral-200: #DFE3EC;      /* borders */
+  --excel-neutral-300: #C6CCDA;
+  --excel-neutral-400: #98A1B3;      /* decorative/disabled ONLY (fails AA) */
+  --excel-neutral-500: #6B7488;      /* lowest tone for real information */
+  --excel-neutral-600: #4B5568;      /* secondary text */
+  --excel-neutral-700: #333C52;
+  --excel-neutral-800: #222941;
+  --excel-neutral-900: #1A2038;      /* primary text */
+
+  /* Semantic */
+  --excel-success-600: #15803D;
+  --excel-success-100: #DCFCE7;
+  --excel-warning-700: #92400E;
+  --excel-warning-100: #FEF3C7;      /* replaces retired "gold" */
+  --excel-danger-600:  var(--excel-red-600);
+  --excel-danger-100:  var(--excel-red-50);
+  --excel-info-600:    var(--excel-navy-600);
+  --excel-info-100:    var(--excel-navy-100);
+
+  /* Pipeline status pairs (bg / text) — all AA */
+  --excel-status-lead-bg: var(--excel-navy-100);
+  --excel-status-lead-fg: var(--excel-navy-600);
+  --excel-status-measuring-bg: #DBEAFE;
+  --excel-status-measuring-fg: #1D4ED8;
+  --excel-status-estimating-bg: #F3E8FF;
+  --excel-status-estimating-fg: #6D28D9;
+  --excel-status-bidsent-bg: #FEF3C7;
+  --excel-status-bidsent-fg: #92400E;
+  --excel-status-accepted-bg: #DCFCE7;
+  --excel-status-accepted-fg: #15803D;
+  --excel-status-closed-bg: #F1F5F9;
+  --excel-status-closed-fg: #475569;
+
+  /* Typography
+     Display face: Jost (Futura descendant; swap to "futura-pt" if an
+     Adobe Fonts kit is added — one-line change). Body face: Inter. */
+  --excel-font-display: 'Jost', 'Futura PT', Futura, 'Century Gothic', sans-serif;
+  --excel-font-body: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --excel-font-mono: 'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --excel-text-display: 30px;
+  --excel-text-h1: 22px;
+  --excel-text-h2: 16px;
+  --excel-text-body: 14px;           /* floor for information text */
+  --excel-text-small: 12.5px;
+  --excel-text-label: 11px;
+  --excel-text-bid-price: 42px;
+
+  /* Spacing (4px grid), radii, elevation, motion */
+  --excel-space-1: 4px;  --excel-space-2: 8px;  --excel-space-3: 12px;
+  --excel-space-4: 16px; --excel-space-5: 20px; --excel-space-6: 24px;
+  --excel-space-8: 32px;
+
+  --excel-radius-sm: 6px;
+  --excel-radius-md: 8px;
+  --excel-radius-lg: 12px;
+  --excel-radius-xl: 16px;
+  --excel-radius-pill: 999px;
+
+  --excel-shadow-1: 0 1px 3px rgba(1,16,48,.08), 0 4px 12px rgba(1,16,48,.06);
+  --excel-shadow-2: 0 4px 16px rgba(1,16,48,.12), 0 1px 4px rgba(1,16,48,.06);
+  --excel-focus-ring: 0 0 0 3px rgba(2,32,95,.30);
+
+  --excel-ease: cubic-bezier(.2,.6,.3,1);
+  --excel-dur-fast: 150ms;
+  --excel-dur-med: 200ms;
+
+  /* ------------------------------------------------------------
+     2. COMPATIBILITY LAYER — demo variables → brand tokens
+     Keep until the codebase references --excel-* directly,
+     then delete this block.
+     ------------------------------------------------------------ */
+  --red: var(--excel-red-500);
+  --red-dark: var(--excel-red-600);
+  --red-light: var(--excel-red-400);
+  --navy: var(--excel-navy-600);
+  --navy-dark: var(--excel-navy-800);
+  --navy-light: var(--excel-navy-500);
+  --dark: var(--excel-navy-900);
+  --gold: var(--excel-warning-700);      /* gold retired; warnings only */
+  --gold-dark: var(--excel-warning-700);
+  --white: var(--excel-neutral-0);
+  --bg: var(--excel-neutral-50);
+  --bg2: var(--excel-neutral-100);
+  --text: var(--excel-neutral-900);
+  --text2: var(--excel-neutral-600);
+  --text3: var(--excel-neutral-500);     /* raised from #9CA3AF for AA */
+  --border: var(--excel-neutral-200);
+  --card: var(--excel-neutral-0);
+  --green: var(--excel-success-600);
+  --orange: var(--excel-warning-700);
+  --blue: var(--excel-navy-500);         /* generic blue folds into brand */
+  --purple: #6D28D9;                     /* estimating status only */
+  --font: var(--excel-font-body);
+  --mono: var(--excel-font-mono);
+  --r: var(--excel-radius-md);
+  --r2: var(--excel-radius-lg);
+  --r3: var(--excel-radius-xl);
+  --shadow: var(--excel-shadow-1);
+  --shadow2: var(--excel-shadow-2);
+}
+
+/* ------------------------------------------------------------
+   3. BASE
+   ------------------------------------------------------------ */
+body {
+  font-family: var(--excel-font-body);
+  font-size: var(--excel-text-body);
+  color: var(--excel-neutral-900);
+  background: var(--excel-neutral-50);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--excel-navy-100); }
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--excel-focus-ring);
+  border-radius: var(--excel-radius-sm);
+}
+
+h1, h2, h3, .page-heading, .card-title, .kpi-val, .stat-val,
+.cash-price-val, .bid-price-amount, .price-display, .logo-name {
+  font-family: var(--excel-font-display);
+}
+
+.money, .num,
+.line-item-ext, .line-item-qty, .line-item-unit,
+.price-display, .cash-price-val, .bid-price-amount,
+.summary-val, .fin-val, .kpi-val, .stat-val {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------
+   4. COMPONENTS (demo class names, brand-correct values)
+   ------------------------------------------------------------ */
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px;
+  border: none; border-radius: var(--excel-radius-md);
+  font-family: var(--excel-font-body);
+  font-size: var(--excel-text-body); font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--excel-dur-fast) var(--excel-ease),
+              box-shadow var(--excel-dur-fast) var(--excel-ease);
+}
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:focus-visible { box-shadow: var(--excel-focus-ring); }
+
+.btn-primary { background: var(--excel-red-500); color: #fff; }
+.btn-primary:hover { background: var(--excel-red-600); }
+.btn-primary:active { background: var(--excel-red-700); }
+
+.btn-navy { background: var(--excel-navy-600); color: #fff; }   /* customer-facing actions */
+.btn-navy:hover { background: var(--excel-navy-700); }
+
+.btn-secondary {
+  background: var(--excel-neutral-0); color: var(--excel-neutral-900);
+  border: 1px solid var(--excel-neutral-200);
+}
+.btn-secondary:hover { background: var(--excel-neutral-50); border-color: var(--excel-neutral-300); }
+
+.btn-ghost { background: transparent; color: var(--excel-neutral-600); }
+.btn-ghost:hover { background: var(--excel-neutral-100); }
+
+/* Chips / manufacturer tabs — selection, never action */
+.chip, .mfr-tab {
+  padding: 5px 12px; border-radius: var(--excel-radius-pill);
+  font-size: 12px; font-weight: 500; cursor: pointer; user-select: none;
+  border: 1.5px solid var(--excel-neutral-200);
+  color: var(--excel-neutral-600); background: var(--excel-neutral-0);
+  transition: all var(--excel-dur-fast) var(--excel-ease);
+}
+.chip.active, .mfr-tab.active {
+  background: var(--excel-navy-600); border-color: var(--excel-navy-600); color: #fff;
+}
+.chip:hover:not(.active), .mfr-tab:hover:not(.active) { border-color: var(--excel-neutral-400); }
+
+/* Status badges */
+.status-badge {
+  padding: 4px 10px; border-radius: var(--excel-radius-pill);
+  font-size: var(--excel-text-label); font-weight: 600;
+  letter-spacing: .3px; text-transform: uppercase;
+}
+.status-LEAD       { background: var(--excel-status-lead-bg);       color: var(--excel-status-lead-fg); }
+.status-MEASURING  { background: var(--excel-status-measuring-bg);  color: var(--excel-status-measuring-fg); }
+.status-ESTIMATING { background: var(--excel-status-estimating-bg); color: var(--excel-status-estimating-fg); }
+.status-BID_SENT   { background: var(--excel-status-bidsent-bg);    color: var(--excel-status-bidsent-fg); }
+.status-ACCEPTED   { background: var(--excel-status-accepted-bg);   color: var(--excel-status-accepted-fg); }
+.status-CLOSED     { background: var(--excel-status-closed-bg);     color: var(--excel-status-closed-fg); }
+
+/* Cards */
+.card {
+  background: var(--excel-neutral-0);
+  border: 1px solid var(--excel-neutral-200);
+  border-radius: var(--excel-radius-lg);
+  box-shadow: var(--excel-shadow-1);
+}
+.card-title { font-size: var(--excel-text-h2); font-weight: 600; }
+
+.project-card { position: relative; }
+.project-card:hover { box-shadow: var(--excel-shadow-2); transform: translateY(-1px); }
+/* Attention bar: default quiet; .attention flags new leads / expiring bids */
+.project-card .red-bar { background: var(--excel-navy-200); }
+.project-card.attention .red-bar { background: var(--excel-red-500); }
+
+/* Forms */
+.form-label {
+  font-size: var(--excel-text-label); font-weight: 600;
+  color: var(--excel-neutral-600);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.form-input, .form-select {
+  padding: 10px 12px;
+  border: 1.5px solid var(--excel-neutral-200);
+  border-radius: var(--excel-radius-md);
+  font-family: var(--excel-font-body);
+  font-size: var(--excel-text-body);
+  color: var(--excel-neutral-900); background: var(--excel-neutral-0);
+  outline: none;
+  transition: border-color var(--excel-dur-fast) var(--excel-ease),
+              box-shadow var(--excel-dur-fast) var(--excel-ease);
+}
+.form-input:focus, .form-select:focus {
+  border-color: var(--excel-navy-600);
+  box-shadow: var(--excel-focus-ring);
+}
+.form-input[readonly], .form-input.computed {
+  background: var(--excel-neutral-50); color: var(--excel-neutral-900);
+}
+@media (pointer: coarse) {
+  .form-input, .form-select { font-size: 16px; }  /* prevents iOS focus zoom */
+  .btn, .nav-item, .chip { min-height: 44px; }
+}
+
+/* Tables */
+.pm-table th {
+  font-size: var(--excel-text-label); font-weight: 600;
+  color: var(--excel-neutral-500);
+  text-transform: uppercase; letter-spacing: .5px;
+  border-bottom: 2px solid var(--excel-neutral-200);
+}
+.pm-table td { font-size: var(--excel-text-body); border-bottom: 1px solid var(--excel-neutral-100); }
+.pm-table tr:hover td { background: var(--excel-neutral-50); }
+.margin-good { color: var(--excel-success-600); font-weight: 600; }
+.margin-ok   { color: var(--excel-warning-700); font-weight: 600; }
+.margin-low  { color: var(--excel-red-600);     font-weight: 600; }
+
+/* Sidebar */
+.sidebar { background: linear-gradient(180deg, var(--excel-navy-600) 0%, var(--excel-navy-900) 100%); }
+.nav-item { color: rgba(255,255,255,.62); font-size: var(--excel-text-body); }
+.nav-item:hover { background: rgba(255,255,255,.08); color: #fff; }
+.nav-item.active { background: var(--excel-red-500); color: #fff; font-weight: 600; }
+.logo-badge { background: var(--excel-red-500); }
+.logo-name { font-weight: 700; letter-spacing: .5px; }
+
+/* Section headers & summary panel */
+.section-header, .summary-header, .cash-price-display, .bid-price-box {
+  background: var(--excel-navy-600);
+}
+.summary-row.total { color: var(--excel-navy-600); }
+.profit-row span:last-child { color: var(--excel-success-600); }
+
+/* Tabs */
+.project-tab.active { color: var(--excel-red-600); border-bottom-color: var(--excel-red-500); }
+
+/* KPI accents — navy/semantic only; gold is retired */
+.kpi-accent { background: var(--excel-navy-600); }
+.kpi-card.kpi-success .kpi-accent { background: var(--excel-success-600); }
+.kpi-card.kpi-warning .kpi-accent { background: var(--excel-warning-700); }
+.kpi-delta.up { color: var(--excel-success-600); }
+.kpi-delta.dn { color: var(--excel-red-600); }
+
+/* ------------------------------------------------------------
+   5. BID DOCUMENT (customer-facing)
+   Allowlist rendering only — see EXCEL_BRAND_GUIDE.md §9.
+   ------------------------------------------------------------ */
+.bid-preview {
+  font-family: var(--excel-font-body);
+  color: var(--excel-neutral-900);
+}
+.bid-header { border-bottom: 3px solid var(--excel-red-500); }
+.bid-logo-block .company-name {
+  font-family: var(--excel-font-display);
+  color: var(--excel-navy-600); font-weight: 800;
+}
+.bid-logo-block .tagline { color: var(--excel-red-500); font-style: italic; }
+.bid-price-amount { font-size: var(--excel-text-bid-price); }
+.bid-footer { color: var(--excel-neutral-600); }
+
+@media print {
+  body { background: #fff; }
+  .sidebar, .topbar, .bottom-nav, .btn { display: none !important; }
+  .bid-preview {
+    box-shadow: none; border: none; max-width: none; padding: 0;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+}
+
+/* ------------------------------------------------------------
+   6. MOTION & ACCESSIBILITY
+   ------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
