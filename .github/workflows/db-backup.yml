@@ -1,0 +1,55 @@
+name: db-backup
+
+# Nightly logical backup of the Supabase Postgres database — the only copy of
+# production data lives on a pausable free tier with no automatic backups. This
+# also queries the DB daily, which keeps the free tier from idle-pausing.
+#
+# SETUP (one time, by Robert):
+#   Repo → Settings → Secrets and variables → Actions → New repository secret
+#     Name:  BACKUP_DATABASE_URL
+#     Value: the Supabase SESSION pooler URL (port 5432), e.g.
+#            postgresql://postgres.<ref>:<password>@aws-1-us-west-2.pooler.supabase.com:5432/postgres
+#   Use the SESSION pooler (5432), NOT the transaction pooler (6543) — pg_dump
+#   needs a session. The direct db.<ref>.supabase.co host is IPv6-only and will
+#   not work from GitHub's IPv4 runners; the pooler host does.
+#
+# Then run it once manually (Actions → db-backup → Run workflow) to confirm the
+# secret and connectivity before relying on the schedule.
+
+on:
+  schedule:
+    - cron: "0 8 * * *" # daily 08:00 UTC (~01:00–02:00 America/Denver)
+  workflow_dispatch: {}
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Dump database
+        env:
+          DBURL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          if [ -z "$DBURL" ]; then
+            echo "::error::BACKUP_DATABASE_URL secret is not set (see the setup note at the top of this workflow)."
+            exit 1
+          fi
+          # Use a postgres client image matching (or newer than) the server so
+          # pg_dump never fails on a version mismatch. Password is passed via env
+          # so it is masked in logs, not echoed on the command line.
+          docker run --rm -e DBURL="$DBURL" postgres:17 \
+            sh -c 'pg_dump --no-owner --no-privileges "$DBURL"' > backup.sql
+          gzip -9 backup.sql
+          ls -lh backup.sql.gz
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-ces-db-backup-${{ github.run_number }}
+          path: backup.sql.gz
+          retention-days: 30
+          if-no-files-found: error
