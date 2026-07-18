@@ -1,0 +1,19 @@
+# deps
+node_modules/
+
+# next.js build output
+.next/
+out/
+
+# env — never commit secrets (.env.example is the tracked template)
+.env*
+!.env.example
+
+# vercel
+.vercel/
+
+# typescript
+*.tsbuildinfo
+
+# misc
+.DS_Store

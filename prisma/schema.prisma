@@ -1,0 +1,283 @@
+// Schema managed via prisma migrate. Never use db push in production.
+// To make schema changes: npx prisma migrate dev --name description_of_change
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum ProjectStatus {
+  LEAD_RECEIVED
+  MEASUREMENT_SCHEDULED
+  MEASURED
+  ESTIMATING
+  BID_CREATED
+  BID_PRESENTED
+  ACCEPTED
+  DECLINED
+  MATERIALS_ORDERED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETE
+  INVOICED
+  PAID
+  CLOSED
+}
+
+enum UserRole {
+  PROJECT_MANAGER
+  SENIOR_PM
+  OFFICE_ADMIN
+  OPS_MANAGER
+  SYSTEM_ADMIN
+}
+
+enum ProductCategory {
+  TEAR_OFF
+  INSTALL
+  SHINGLE
+  UNDERLAYMENT
+  STARTER
+  HIP_RIDGE
+  DETAIL_METAL
+  DECKING
+  VENT
+  SBS
+  SEALANT
+  FASTENER
+  GUTTER
+  INSULATION
+  LIGHTING
+  MISC
+}
+
+enum UnitType {
+  SQUARE
+  LINEAR_FOOT
+  UNIT
+  SHEET
+  ROLL
+  EACH
+  BOX
+  CAN
+  BUNDLE
+}
+
+enum DocumentType {
+  BID_STANDARD
+  BID_SENIOR
+  BID_OPEN
+  BID_REPAIR
+  MATERIAL_ORDER
+  ROOFER_INVOICE
+  JOB_ORDER
+  GUTTER_ORDER
+  ROOFER_INSTRUCTIONS
+  CUSTOMER_INVOICE
+}
+
+model User {
+  id        String   @id @default(uuid())
+  clerkId   String?  @unique @map("clerk_id")
+  name      String
+  email     String   @unique
+  phone     String?
+  role      UserRole @default(PROJECT_MANAGER)
+  isActive        Boolean  @default(true) @map("is_active")
+  defaultMarkupPct Decimal @default(0.30) @map("default_markup_pct") @db.Decimal(5, 4)
+  organizationId  String?  @map("organization_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  projects         Project[]
+  createdProjects  Project[]        @relation("ProjectCreatedBy")
+  documents        Document[]
+  priceChanges     ProductPriceHistory[]
+  estimates        Estimate[]       @relation("EstimateCreatedBy")
+
+  @@map("users")
+}
+
+model Project {
+  id                String        @id @default(uuid())
+  customerName      String        @map("customer_name")
+  address           String?
+  city              String?
+  zip               String?
+  phonePrimary      String?       @map("phone_primary")
+  phoneSecondary    String?       @map("phone_secondary")
+  email             String?
+  poNumber          String?       @map("po_number")
+  status            ProjectStatus @default(LEAD_RECEIVED)
+  insuranceProvider String?       @map("insurance_provider")
+  claimNumber       String?       @map("claim_number")
+  extendedWarranty  Boolean       @default(false) @map("extended_warranty")
+  previousCustomer  Boolean       @default(false) @map("previous_customer")
+  municipality      String?
+  permitNumber      String?       @map("permit_number")
+  notes             String?
+  organizationId    String?       @map("organization_id")
+  deletedAt         DateTime?     @map("deleted_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  pmId          String  @map("pm_id")
+  pm            User    @relation(fields: [pmId], references: [id])
+  createdById   String? @map("created_by_id")
+  createdBy     User?   @relation("ProjectCreatedBy", fields: [createdById], references: [id])
+  measurement   Measurement?
+  estimate      Estimate?
+  documents     Document[]
+
+  @@index([pmId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("projects")
+}
+
+model Measurement {
+  id              String   @id @default(uuid())
+  projectId       String   @unique @map("project_id")
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  roofAreas       Json     @default("[]") @map("roof_areas")
+  ridgeLf         Decimal  @default(0) @map("ridge_lf") @db.Decimal(10, 2)
+  eavesLf         Decimal  @default(0) @map("eaves_lf") @db.Decimal(10, 2)
+  iwShieldLf      Decimal  @default(0) @map("iw_shield_lf") @db.Decimal(10, 2)
+  starterLf       Decimal  @default(0) @map("starter_lf") @db.Decimal(10, 2)
+  rakeLf          Decimal  @default(0) @map("rake_lf") @db.Decimal(10, 2)
+  extraRakeLf     Decimal  @default(0) @map("extra_rake_lf") @db.Decimal(10, 2)
+  valleyLf        Decimal  @default(0) @map("valley_lf") @db.Decimal(10, 2)
+  stepFlashingLf  Decimal  @default(0) @map("step_flashing_lf") @db.Decimal(10, 2)
+  counterFlashLf  Decimal  @default(0) @map("counter_flash_lf") @db.Decimal(10, 2)
+  headwallFlashLf Decimal  @default(0) @map("headwall_flash_lf") @db.Decimal(10, 2)
+  pipeFlashings   Json     @default("[]") @map("pipe_flashings")
+  skylights       Json     @default("{}") @map("skylights")
+  chimneyCount    Int      @default(0) @map("chimney_count")
+  swampCoolerCt   Int      @default(0) @map("swamp_cooler_count")
+  acCount         Int      @default(0) @map("ac_count")
+  additionalLayers Int     @default(0) @map("additional_layers")
+  pitch           String?
+  stories         Int      @default(1)
+  soffitType      String?  @map("soffit_type")
+  gutterSize      String?  @map("gutter_size")
+  roofTypeRemoved String?  @map("roof_type_removed")
+  ridgeVentType   String?  @map("ridge_vent_type")
+  valleyType      String?  @map("valley_type")
+  flashingColor   String?  @map("flashing_color")
+  totalSqFt       Decimal  @default(0) @map("total_sq_ft") @db.Decimal(10, 2)
+  totalSquares    Decimal  @default(0) @map("total_squares") @db.Decimal(10, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("measurements")
+}
+
+model Estimate {
+  id                 String   @id @default(uuid())
+  projectId          String   @unique @map("project_id")
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  markupPct          Decimal  @default(0.30) @map("markup_pct") @db.Decimal(5, 4)
+  pmSplitPct         Decimal  @default(0.44) @map("pm_split_pct") @db.Decimal(5, 4)
+  taxRate            Decimal  @default(0.083) @map("tax_rate") @db.Decimal(5, 4)
+  fuelCharge         Decimal  @default(100) @map("fuel_charge") @db.Decimal(10, 2)
+  overheadPct        Decimal  @default(0.10) @map("overhead_pct") @db.Decimal(5, 4)
+  overheadCap        Decimal  @default(2000) @map("overhead_cap") @db.Decimal(10, 2)
+  permitCost         Decimal  @default(0) @map("permit_cost") @db.Decimal(10, 2)
+  salePriceOverride  Decimal? @map("sale_price_override") @db.Decimal(10, 2)
+  overrideReason     String?  @map("override_reason")
+  shingleColor       String?  @map("shingle_color")
+  cachedCashPrice    Decimal? @map("cached_cash_price") @db.Decimal(10, 2)
+  estimatedById      String?  @map("estimated_by_id")
+  estimatedBy        User?    @relation("EstimateCreatedBy", fields: [estimatedById], references: [id])
+  lineItems          EstimateLineItem[]
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("estimates")
+}
+
+model EstimateLineItem {
+  id          String          @id @default(uuid())
+  estimateId  String          @map("estimate_id")
+  estimate    Estimate        @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  category    ProductCategory
+  productId   String?         @map("product_id")
+  product     Product?        @relation(fields: [productId], references: [id])
+  productName String          @map("product_name")
+  unitCost    Decimal         @map("unit_cost") @db.Decimal(10, 2)
+  quantity    Decimal         @map("quantity") @db.Decimal(10, 2)
+  unitType    UnitType        @default(UNIT) @map("unit_type")
+  layers      Int             @default(1)
+  isLabor     Boolean         @default(false) @map("is_labor")
+  sortOrder   Int             @default(0) @map("sort_order")
+  notes       String?
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@index([estimateId])
+  @@map("estimate_line_items")
+}
+
+model Product {
+  id               String          @id @default(uuid())
+  name             String
+  category         ProductCategory
+  manufacturer     String?
+  unitCost         Decimal         @map("unit_cost") @db.Decimal(10, 2)
+  unitType         UnitType        @default(UNIT) @map("unit_type")
+  isLabor          Boolean         @default(false) @map("is_labor")
+  isActive         Boolean         @default(true) @map("is_active")
+  autoPopulateRule String?         @map("auto_populate_rule")
+  sortOrder        Int             @default(0) @map("sort_order")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  lineItems        EstimateLineItem[]
+  priceHistory     ProductPriceHistory[]
+
+  @@index([category])
+  @@map("products")
+}
+
+model ProductPriceHistory {
+  id          String   @id @default(uuid())
+  productId   String   @map("product_id")
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  oldPrice    Decimal  @map("old_price") @db.Decimal(10, 2)
+  newPrice    Decimal  @map("new_price") @db.Decimal(10, 2)
+  changedById String?  @map("changed_by_id")
+  changedBy   User?    @relation(fields: [changedById], references: [id])
+  changedAt   DateTime @default(now()) @map("changed_at")
+
+  @@index([productId])
+  @@map("product_price_history")
+}
+
+model ShingleColor {
+  id           String   @id @default(uuid())
+  name         String
+  manufacturer String?
+  isActive     Boolean  @default(true) @map("is_active")
+  sortOrder    Int      @default(0) @map("sort_order")
+
+  @@map("shingle_colors")
+}
+
+model Document {
+  id              String       @id @default(uuid())
+  projectId       String       @map("project_id")
+  project         Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type            DocumentType
+  templateVersion String?      @map("template_version")
+  fileUrl         String?      @map("file_url")
+  generatedAt     DateTime     @default(now()) @map("generated_at")
+  generatedById   String       @map("generated_by_id")
+  generatedBy     User         @relation(fields: [generatedById], references: [id])
+
+  @@index([projectId])
+  @@map("documents")
+}

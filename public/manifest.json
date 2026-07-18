@@ -1,0 +1,13 @@
+{
+  "name": "Excel CES",
+  "short_name": "CES",
+  "description": "Excel Roofing — Cost Estimating System",
+  "start_url": "/projects",
+  "display": "standalone",
+  "background_color": "#F9FAFB",
+  "theme_color": "#1E2A4A",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
