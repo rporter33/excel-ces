@@ -2,6 +2,12 @@
 
 Before making changes, read all files in ./lessons/
 
+Read branding/EXCEL_BRAND_GUIDE.md before touching any UI, copy, or
+customer-facing output. It is authoritative. Canonical design tokens live in
+`src/lib/brand.ts`. Note: the brand package targets the standalone demo, not
+this Tailwind app — wiring it into the live UI is deliberate Phase-3 work, not
+yet applied. See branding/README.md.
+
 Mobile-first roofing estimation app for Excel Roofing. Next.js 15 (App Router,
 src/ layout), Prisma 6 + Supabase Postgres, Clerk auth, vitest.
 
