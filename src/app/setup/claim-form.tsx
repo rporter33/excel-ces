@@ -4,64 +4,46 @@ import { useState, useTransition } from "react";
 import { claimUserRecord } from "@/lib/actions";
 import { Loader2 } from "lucide-react";
 
-interface User { id: string; name: string; email: string; role: string }
-
 export function ClaimForm({
-  clerkId,
-  suggestedUserId,
-  users,
+  matchedName,
+  email,
 }: {
-  clerkId: string;
-  suggestedUserId: string | null;
-  users: User[];
+  matchedName: string | null;
+  email: string;
 }) {
-  const [selectedId, setSelectedId] = useState(suggestedUserId ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function submit() {
-    if (!selectedId) { setError("Please select your name."); return; }
     setError(null);
     startTransition(async () => {
-      const result = await claimUserRecord(clerkId, selectedId);
+      // Identity + match are derived server-side; the action takes no input.
+      const result = await claimUserRecord();
       if (result?.error) setError(result.error);
     });
   }
 
-  if (users.length === 0) {
+  if (!matchedName) {
     return (
       <p className="text-sm text-gray-500 text-center py-4">
-        All user accounts are already linked. Contact an admin to add your account.
+        No staff record matches{email ? ` ${email}` : " your email"}. Ask an admin
+        to add your account, then sign in again.
       </p>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div>
-        <label className="label">I am</label>
-        <select
-          value={selectedId}
-          onChange={(e) => setSelectedId(e.target.value)}
-          className="input-field"
-        >
-          <option value="">— Select your name —</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name} ({u.role.replace(/_/g, " ").toLowerCase()})
-            </option>
-          ))}
-        </select>
+      <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
+        Link this login to <strong>{matchedName}</strong>?
       </div>
 
-      {error && (
-        <p className="text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       <button
         type="button"
         onClick={submit}
-        disabled={isPending || !selectedId}
+        disabled={isPending}
         className="btn-primary w-full disabled:opacity-60"
       >
         {isPending ? (

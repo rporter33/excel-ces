@@ -7,8 +7,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { calculateEstimate, type LineItem } from "./pricing-engine";
-import { auth } from "@clerk/nextjs/server";
-import { requireDbUserAction } from "./auth";
+import { auth, currentUser } from "@clerk/nextjs/server";
+import { requireDbUserAction, hasDashboardAccess } from "./auth";
 import {
   canSeeAllProjects,
   canEditProductCatalog,
@@ -18,27 +18,64 @@ import {
 
 // ─── AUTH HELPERS ────────────────────────────────────────────
 
-/** Returns the logged-in DB User, or null if not authenticated / not linked. */
-export async function getCurrentDbUser() {
-  try {
-    const { userId } = await auth();
-    if (!userId) return null;
-    return prisma.user.findUnique({ where: { clerkId: userId } });
-  } catch {
-    // Clerk not configured (missing env vars) — allow unauthenticated access in dev
-    return null;
-  }
+/**
+ * Loads a non-deleted project the current user may act on, or null.
+ * PROJECT_MANAGERs are scoped to their own projects; senior/admin roles see
+ * all. Returns null for both "missing" and "not yours" so existence never
+ * leaks. Every project-scoped read/write action funnels through this.
+ */
+async function projectForUser(
+  user: { id: string; role: string },
+  projectId: string
+): Promise<{ id: string; pmId: string } | null> {
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, deletedAt: null },
+    select: { id: true, pmId: true },
+  });
+  if (!project) return null;
+  if (!canSeeAllProjects(user) && project.pmId !== user.id) return null;
+  return project;
 }
 
-/** Claim a DB User record for a newly-signed-in Clerk user. */
-export async function claimUserRecord(clerkId: string, dbUserId: string) {
-  // Verify the target record isn't already claimed
-  const target = await prisma.user.findUnique({ where: { id: dbUserId } });
-  if (!target) return { error: "User record not found." };
-  if (target.clerkId && target.clerkId !== clerkId) {
-    return { error: "This account is already linked to another login." };
+/**
+ * Link the signed-in Clerk user to their existing staff record.
+ *
+ * Security: identity comes entirely from the server session — never from the
+ * client. A record may be claimed only if it is unlinked AND its email equals
+ * the session's verified primary email. This prevents a stranger from claiming
+ * a higher-privileged record (e.g. SYSTEM_ADMIN), which the old signature
+ * (taking clerkId + a client-chosen dbUserId) allowed.
+ */
+export async function claimUserRecord() {
+  const { userId } = await auth();
+  if (!userId) return { error: "Not signed in. Please sign in again." };
+
+  // Already linked → nothing to claim.
+  const already = await prisma.user.findUnique({ where: { clerkId: userId } });
+  if (already) redirect("/projects");
+
+  const clerkUser = await currentUser();
+  const primaryId = clerkUser?.primaryEmailAddressId;
+  const email =
+    clerkUser?.emailAddresses?.find((e) => e.id === primaryId)?.emailAddress ??
+    clerkUser?.emailAddresses?.[0]?.emailAddress ??
+    null;
+  if (!email) {
+    return { error: "Your login has no email address. Contact an admin." };
   }
-  await prisma.user.update({ where: { id: dbUserId }, data: { clerkId } });
+
+  // Only an unlinked record whose email matches the verified session email.
+  const target = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" }, clerkId: null },
+  });
+  if (!target) {
+    return {
+      error:
+        "No staff record matches your email. Ask an admin to add your account, then sign in again.",
+    };
+  }
+
+  await prisma.user.update({ where: { id: target.id }, data: { clerkId: userId } });
   redirect("/projects");
 }
 
@@ -118,7 +155,7 @@ export async function createProjectForm(
 }
 
 export async function updateProject(formData: FormData) {
-  await requireDbUserAction();
+  const { dbUser } = await requireDbUserAction();
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = UpdateProjectSchema.safeParse({
@@ -131,6 +168,10 @@ export async function updateProject(formData: FormData) {
   }
 
   const { id, pmId, ...data } = parsed.data;
+
+  if (!(await projectForUser(dbUser, id))) {
+    return { error: { _form: ["Project not found or access denied."] } };
+  }
 
   await prisma.project.update({
     where: { id },
@@ -167,10 +208,13 @@ const VALID_STATUSES = [
 type ProjectStatus = typeof VALID_STATUSES[number];
 
 export async function updateProjectStatus(projectId: string, status: string) {
-  await requireDbUserAction();
+  const { dbUser } = await requireDbUserAction();
 
   if (!(VALID_STATUSES as readonly string[]).includes(status)) {
     return { error: `Invalid status: ${status}` };
+  }
+  if (!(await projectForUser(dbUser, projectId))) {
+    return { error: "Project not found or access denied." };
   }
   await prisma.project.update({
     where: { id: projectId },
@@ -185,11 +229,11 @@ export async function getProjects(filters?: {
   search?: string;
   pmId?: string;
 }) {
-  const currentUser = await getCurrentDbUser();
+  const { dbUser: currentUser } = await requireDbUserAction();
   const where: any = {};
 
   // PMs only see their own projects; senior/admin roles see all
-  if (currentUser && !canSeeAllProjects(currentUser)) {
+  if (!canSeeAllProjects(currentUser)) {
     where.pmId = currentUser.id;
   } else if (filters?.pmId) {
     where.pmId = filters.pmId;
@@ -223,7 +267,8 @@ export async function getProjects(filters?: {
 }
 
 export async function getProject(id: string) {
-  return prisma.project.findFirst({
+  const { dbUser: current } = await requireDbUserAction();
+  const project = await prisma.project.findFirst({
     where: { id, deletedAt: null },
     include: {
       pm: true,
@@ -240,6 +285,10 @@ export async function getProject(id: string) {
       },
     },
   });
+  if (!project) return null;
+  // PMs may only open their own projects; senior/admin roles see all.
+  if (!canSeeAllProjects(current) && project.pmId !== current.id) return null;
+  return project;
 }
 
 export async function deleteProject(id: string) {
@@ -289,6 +338,7 @@ export async function updateDefaultMarkup(userId: string, markupPct: number) {
 }
 
 export async function getUsers() {
+  await requireDbUserAction();
   return prisma.user.findMany({
     where: { isActive: true },
     select: { id: true, name: true, role: true },
@@ -310,6 +360,9 @@ export async function saveEstimate(formData: FormData) {
   const salePriceOverride = salePriceOverrideRaw ? parseFloat(salePriceOverrideRaw) || null : null;
 
   if (!projectId) return { success: false as const, error: "Missing projectId" };
+  if (!(await projectForUser(estimator, projectId))) {
+    return { success: false as const, error: "Project not found or access denied." };
+  }
 
   let lineItems: Array<{
     productId: string | null;
@@ -419,13 +472,17 @@ const MeasurementSchema = z.object({
 });
 
 export async function saveMeasurement(formData: FormData) {
-  await requireDbUserAction();
+  const { dbUser } = await requireDbUserAction();
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = MeasurementSchema.safeParse(raw);
 
   if (!parsed.success) {
     return { error: parsed.error.flatten().fieldErrors };
+  }
+
+  if (!(await projectForUser(dbUser, parsed.data.projectId))) {
+    return { error: { _form: ["Project not found or access denied."] } };
   }
 
   const {
@@ -492,6 +549,11 @@ export async function saveMeasurement(formData: FormData) {
 export async function generateBidPdf(projectId: string): Promise<
   { success: true; base64: string } | { success: false; error: string }
 > {
+  const { dbUser } = await requireDbUserAction();
+  if (!(await projectForUser(dbUser, projectId))) {
+    return { success: false, error: "Project not found or access denied." };
+  }
+
   const project = await prisma.project.findFirst({
     where: { id: projectId, deletedAt: null },
     include: {
@@ -551,6 +613,11 @@ export async function generateBidPdf(projectId: string): Promise<
 const CLOSED_STATUSES = ["CLOSED", "DECLINED", "PAID"] as const;
 
 export async function getDashboardData() {
+  const { dbUser } = await requireDbUserAction();
+  if (!hasDashboardAccess(dbUser)) {
+    throw new Error("Not authorized to view the dashboard.");
+  }
+
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);

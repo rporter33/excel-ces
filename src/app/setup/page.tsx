@@ -15,21 +15,22 @@ export default async function SetupPage() {
   if (existing) redirect("/projects");
 
   const clerkUser = await currentUser();
-  const clerkEmail = clerkUser?.emailAddresses?.[0]?.emailAddress ?? "";
+  const primaryId = clerkUser?.primaryEmailAddressId;
+  const clerkEmail =
+    clerkUser?.emailAddresses?.find((e) => e.id === primaryId)?.emailAddress ??
+    clerkUser?.emailAddresses?.[0]?.emailAddress ??
+    "";
 
-  // Try to find a matching unlinked user by email
+  // Only an unlinked record whose email matches the verified sign-in email is
+  // claimable. We never list other staff records or their roles — that let a
+  // stranger pick and claim an admin account. The claim action re-derives this
+  // match server-side; nothing here is trusted as input to the claim.
   const matchedUser = clerkEmail
     ? await prisma.user.findFirst({
-        where: { email: clerkEmail, clerkId: null },
+        where: { email: { equals: clerkEmail, mode: "insensitive" }, clerkId: null },
+        select: { name: true },
       })
     : null;
-
-  // All unlinked users (for manual selection fallback)
-  const unlinkedUsers = await prisma.user.findMany({
-    where: { clerkId: null, isActive: true },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true, email: true, role: true },
-  });
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
@@ -41,23 +42,13 @@ export default async function SetupPage() {
           <h1 className="text-xl font-bold text-gray-900">Welcome to Excel CES</h1>
           <p className="text-sm text-gray-500 mt-1">
             {matchedUser
-              ? `We found a match for ${clerkEmail}. Confirm to continue.`
-              : "Select your name to link your account."}
+              ? `Confirm your account to continue.`
+              : "Account setup"}
           </p>
         </div>
 
         <div className="card">
-          {matchedUser ? (
-            <div className="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
-              Email match found: <strong>{matchedUser.name}</strong>
-            </div>
-          ) : null}
-
-          <ClaimForm
-            clerkId={userId}
-            suggestedUserId={matchedUser?.id ?? null}
-            users={unlinkedUsers}
-          />
+          <ClaimForm matchedName={matchedUser?.name ?? null} email={clerkEmail} />
         </div>
       </div>
     </div>
