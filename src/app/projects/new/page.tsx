@@ -3,6 +3,12 @@ import { ArrowLeft } from "lucide-react";
 import { getUsers } from "@/lib/actions";
 import { NewProjectForm } from "./new-project-form";
 
+// Per-user, auth-gated page that reads the DB (getUsers) — must render at
+// request time, never be prerendered at build. Without this, `next build`
+// tries to statically generate it and fails when DATABASE_URL is absent
+// (e.g. Vercel Preview deployments, which don't get Production-scoped env vars).
+export const dynamic = "force-dynamic";
+
 export default async function NewProjectPage() {
   const users = await getUsers();
 

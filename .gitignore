@@ -17,3 +17,8 @@ out/
 
 # misc
 .DS_Store
+
+# branding demo mockups carry real customer PII (names, addresses, phones,
+# emails, insurance claim numbers) — kept OUTSIDE the repo at
+# ../excel-ces-recovery/. This is a backstop. See branding/README.md.
+branding/*.html
